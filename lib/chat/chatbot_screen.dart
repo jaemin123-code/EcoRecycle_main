@@ -19,7 +19,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final ScrollController _scrollController = ScrollController();
 
   // API 키 가져오기 (api_key.dart 파일이 없다면 여기에 직접 'AIza...' 키를 넣으세요)
-  static const String _apiKey = 'AIzaSyAIbSz49sheHNWt_-jfKyVfoaGjiDUSp7U';
+  static const String _apiKey = ;
 
   late final GenerativeModel _model;
   late final ChatSession _chatSession;
