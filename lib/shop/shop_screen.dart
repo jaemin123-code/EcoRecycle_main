@@ -18,9 +18,9 @@ class _ShopScreenState extends State<ShopScreen> {
 
   // 아이템 데이터
   final List<Map<String, dynamic>> sprays = [
-    {'image': 'assets/spray1.png', 'price': 100, 'growth': '8%'},
-    {'image': 'assets/spray2.png', 'price': 200, 'growth': '10%'},
-    {'image': 'assets/spray3.png', 'price': 300, 'growth': '12%'},
+    {'image': 'assets/spray1.png', 'price': 100, 'growth': '8%', 'name': '기본 영양제'},
+    {'image': 'assets/spray2.png', 'price': 200, 'growth': '10%', 'name': '고급 영양제'},
+    {'image': 'assets/spray3.png', 'price': 300, 'growth': '12%', 'name': '특급 영양제'},
   ];
 
   final List<Map<String, dynamic>> dresses = [
@@ -44,27 +44,40 @@ class _ShopScreenState extends State<ShopScreen> {
     dressOwned = List<bool>.filled(dresses.length, false);
   }
 
-  // ★ [핵심] Firebase에서 포인트 차감하는 함수
-  Future<bool> _deductPoints(int price) async {
+  // ★ [수정됨] 포인트 차감 + 사용 내역 저장 함수
+  Future<bool> _deductPoints(int price, String itemName) async {
     if (user == null) return false;
 
     try {
-      // 1. 현재 내 점수 가져오기 (DB 조회)
       final docRef = FirebaseFirestore.instance.collection('users').doc(user!.uid);
-      final doc = await docRef.get();
 
-      if (!doc.exists) return false;
+      // 트랜잭션 사용 (안전하게 처리)
+      return await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
 
-      int currentPoints = doc.data()?['point'] ?? 0;
+        if (!snapshot.exists) return false;
 
-      // 2. 점수가 충분한지 확인
-      if (currentPoints >= price) {
-        // 3. 점수 차감하고 업데이트
-        await docRef.update({'point': currentPoints - price});
-        return true; // 구매 성공
-      } else {
-        return false; // 잔액 부족
-      }
+        int currentPoints = snapshot.data()?['point'] ?? 0;
+
+        if (currentPoints >= price) {
+          // 1. 포인트 차감
+          transaction.update(docRef, {'point': currentPoints - price});
+
+          // 2. [추가됨] 사용 내역 기록 (마이페이지 연동용)
+          final historyRef = FirebaseFirestore.instance.collection('point_history').doc();
+          transaction.set(historyRef, {
+            'uid': user!.uid,
+            'amount': price,
+            'description': itemName, // 상품명 저장
+            'type': 'use', // 사용
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+
+          return true; // 성공
+        } else {
+          return false; // 잔액 부족
+        }
+      });
     } catch (e) {
       print("구매 오류: $e");
       return false;
@@ -126,7 +139,7 @@ class _ShopScreenState extends State<ShopScreen> {
                     child: Image.asset(topImage, fit: BoxFit.contain),
                   ),
                 ),
-                // ★ [핵심] 현재 포인트 (StreamBuilder로 실시간 연동)
+                // 포인트 표시 (실시간 연동)
                 Padding(
                   padding: const EdgeInsets.only(right: 20),
                   child: Column(
@@ -168,6 +181,7 @@ class _ShopScreenState extends State<ShopScreen> {
               itemBuilder: (context, index) {
                 final spray = sprays[index];
                 final int price = spray['price'];
+                final String name = spray['name'] ?? '영양제'; // 이름 없을 경우 대비
                 final bool isBought = sprayPurchased[index];
 
                 return Container(
@@ -191,11 +205,11 @@ class _ShopScreenState extends State<ShopScreen> {
                           minimumSize: const Size(80, 30),
                         ),
                         onPressed: isBought ? null : () async {
-                          // ★ 구매 로직
-                          bool success = await _deductPoints(price);
+                          // ★ [수정됨] 이름도 같이 넘겨줍니다.
+                          bool success = await _deductPoints(price, name);
                           if (success) {
                             setState(() { sprayPurchased[index] = true; });
-                            _showSnackBar('영양제를 구매했습니다!');
+                            _showSnackBar('$name 구매 완료!');
                           } else {
                             _showSnackBar('포인트가 부족합니다!');
                           }
@@ -225,6 +239,7 @@ class _ShopScreenState extends State<ShopScreen> {
               itemBuilder: (context, index) {
                 final dress = dresses[index];
                 final int price = dress['price'];
+                final String name = dress['name'];
                 final bool isOwned = dressOwned[index];
                 final bool isEquipped = currentEquippedIndex == index;
 
@@ -258,11 +273,11 @@ class _ShopScreenState extends State<ShopScreen> {
                                 style: ElevatedButton.styleFrom(backgroundColor: btnColor, foregroundColor: Colors.white, minimumSize: const Size(100, 32)),
                                 onPressed: isEquipped ? null : () async {
                                   if (!isOwned) {
-                                    // ★ 구매 시도
-                                    bool success = await _deductPoints(price);
+                                    // ★ [수정됨] 이름도 같이 넘겨줍니다.
+                                    bool success = await _deductPoints(price, name);
                                     if (success) {
                                       setState(() { dressOwned[index] = true; });
-                                      _showSnackBar('${dress['name']} 구매 완료!');
+                                      _showSnackBar('$name 구매 완료!');
                                     } else {
                                       _showSnackBar('포인트가 부족합니다!');
                                     }

@@ -1,128 +1,188 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'cert_upload.dart';
+import 'cert_upload.dart'; // 글쓰기 화면
 
+// ---------------------------------------------------------
+// [메인] 에코 인증 게시판 (그리드 화면)
+// ---------------------------------------------------------
 class CertScreen extends StatelessWidget {
   const CertScreen({super.key});
-
-  // 날짜를 "0000년 00월 00일" 형태로 변환하는 함수
-  String _formatDate(DateTime date) {
-    return "${date.year}년 ${date.month}월 ${date.day}일";
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("에코 인증"),
+        title: const Text("에코 인증 게시판", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.camera_alt),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CertUploadScreen()),
-          );
-        },
+      body: Column(
+        children: [
+          // 1. 상단 헤더 (게시물 수 + 글쓰기 버튼)
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                const Icon(Icons.eco, color: Colors.green, size: 40),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("#에코 인증", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('certifications').snapshots(),
+                      builder: (context, snapshot) {
+                        int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                        return Text("게시물 : $count개", style: TextStyle(color: Colors.grey[600]));
+                      },
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CertUploadScreen()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Text("인증하고 포인트 받기", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1),
+
+          // 2. 사진 그리드 갤러리
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('certifications').orderBy('timestamp', descending: true).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(child: Text("아직 인증 게시물이 없어요. 첫 인증을 남겨보세요!", style: TextStyle(color: Colors.grey)));
+                }
+
+                final docs = snapshot.data!.docs;
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(2),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3, // 한 줄에 3개
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                    childAspectRatio: 1, // 정사각형
+                  ),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final imageUrl = data['imageUrl'];
+
+                    return GestureDetector(
+                      onTap: () {
+                        // [수정된 부분] 상세 페이지로 이동!
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CertDetailScreen(data: data),
+                          ),
+                        );
+                      },
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? Hero( // Hero 애니메이션 추가 (화면 전환 시 부드럽게)
+                        tag: imageUrl,
+                        child: Image.network(imageUrl, fit: BoxFit.cover),
+                      )
+                          : Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported, color: Colors.grey)),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('posts')
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("아직 업로드된 인증이 없어요."));
-          }
+    );
+  }
+}
 
-          final docs = snapshot.data!.docs;
+// ---------------------------------------------------------
+// [추가된 화면] 인증 상세 페이지 (크게 보기)
+// ---------------------------------------------------------
+class CertDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> data;
 
-          // 1. 데이터를 날짜별로 그룹핑하기 위한 Map 생성
-          Map<String, List<QueryDocumentSnapshot>> groupedData = {};
+  const CertDetailScreen({super.key, required this.data});
 
-          for (var doc in docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            // timestamp가 없으면 현재 시간으로 처리 (에러 방지)
-            final Timestamp timestamp = data['timestamp'] ?? Timestamp.now();
-            final DateTime dateTime = timestamp.toDate();
+  @override
+  Widget build(BuildContext context) {
+    // 날짜 변환
+    String dateStr = "날짜 정보 없음";
+    if (data['timestamp'] != null) {
+      DateTime date = (data['timestamp'] as Timestamp).toDate();
+      dateStr = "${date.year}년 ${date.month}월 ${date.day}일 ${date.hour}:${date.minute}";
+    }
 
-            // 날짜 키 생성 (예: "2024년 12월 4일")
-            final String dateKey = _formatDate(dateTime);
+    return Scaffold(
+      backgroundColor: Colors.white, // 배경 흰색
+      appBar: AppBar(
+        title: const Text("인증 상세", style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black), // 뒤로가기 버튼 검은색
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. 큰 이미지
+            SizedBox(
+              width: double.infinity,
+              child: data['imageUrl'] != null
+                  ? Hero(
+                tag: data['imageUrl'],
+                child: Image.network(
+                  data['imageUrl'],
+                  fit: BoxFit.contain, // 사진 비율 유지하며 다 보여주기
+                ),
+              )
+                  : Container(height: 300, color: Colors.grey[200], child: const Icon(Icons.broken_image)),
+            ),
 
-            if (!groupedData.containsKey(dateKey)) {
-              groupedData[dateKey] = [];
-            }
-            groupedData[dateKey]!.add(doc);
-          }
-
-          // 2. 그룹핑된 키(날짜)를 리스트로 변환
-          final dateKeys = groupedData.keys.toList();
-
-          // 3. 리스트뷰로 날짜별 섹션 출력
-          return ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: dateKeys.length,
-            itemBuilder: (context, index) {
-              final dateKey = dateKeys[index];
-              final dayDocs = groupedData[dateKey]!;
-
-              return Column(
+            // 2. 내용 및 날짜
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 날짜 헤더
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Text(
-                      dateKey,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                  // 날짜 표시
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                      const SizedBox(width: 5),
+                      Text(
+                        dateStr,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
-                    ),
+                    ],
                   ),
-                  // 해당 날짜의 그리드 뷰
-                  GridView.builder(
-                    shrinkWrap: true, // 리스트뷰 안에서 그리드뷰를 쓸 때 필수
-                    physics: const NeverScrollableScrollPhysics(), // 스크롤 충돌 방지
-                    itemCount: dayDocs.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemBuilder: (context, gridIndex) {
-                      final data = dayDocs[gridIndex].data() as Map<String, dynamic>;
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          data['imageUrl'],
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(child: CircularProgressIndicator());
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey,
-                              child: const Center(child: Icon(Icons.error)),
-                            );
-                          },
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 15),
+
+                  // 본문 내용
+                  Text(
+                    data['description'] ?? "내용이 없습니다.",
+                    style: const TextStyle(fontSize: 18, height: 1.5, color: Colors.black87),
                   ),
-                  const SizedBox(height: 10), // 날짜 그룹 간 간격
                 ],
-              );
-            },
-          );
-        },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

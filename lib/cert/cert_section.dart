@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'cert_screen.dart';
+import 'cert_screen.dart'; // 같은 폴더에 있는 cert_screen.dart 가져오기
 
 class CertSection extends StatelessWidget {
   const CertSection({super.key});

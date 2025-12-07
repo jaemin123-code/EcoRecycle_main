@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:camera/camera.dart';
 
+// [중요] 각 페이지 import 경로 확인해주세요.
+import '../mypage/mypage_screen.dart';
 import '../widgets/shorts_tips_widget.dart';
 import '../chat/chatbot_screen.dart';
 import '../community/community_screen.dart';
 import '../camera/ai_camera_screen.dart';
-
 import '../widgets/sprout_section.dart';
 import '../widgets/tip_menu.dart';
 import '../cert/cert_section.dart';
@@ -15,6 +16,54 @@ import 'quiz_section.dart';
 import 'eco_participation.dart';
 import '../shop/shop_screen.dart';
 
+// ---------------------------------------------------------
+// [위젯 1] 사이드 메뉴에서 '환영합니다 닉네임님' 보여주는 위젯
+// ---------------------------------------------------------
+class DrawerNicknameDisplay extends StatelessWidget {
+  const DrawerNicknameDisplay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // 로그인 안 했을 때
+    if (user == null) {
+      return const Text(
+        '환영합니다 게스트님',
+        style: TextStyle(color: Colors.white, fontSize: 18),
+      );
+    }
+
+    // 로그인 했을 때 DB에서 닉네임 실시간 감시
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String nickname = "환경지킴이"; // 기본값
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          nickname = data['nickname'] ?? "환경지킴이";
+        }
+
+        return Text(
+          '환영합니다 $nickname님!',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold, // 굵게 표시
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// [위젯 2] 사이드 메뉴에서 '포인트' 보여주는 위젯
+// ---------------------------------------------------------
 class RealtimePointDisplay extends StatelessWidget {
   const RealtimePointDisplay({super.key});
 
@@ -25,25 +74,43 @@ class RealtimePointDisplay extends StatelessWidget {
       return const Text("로그인 필요", style: TextStyle(color: Colors.white));
     }
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Text("오류", style: TextStyle(color: Colors.white));
+        if (snapshot.hasError) {
+          return const Text("오류", style: TextStyle(color: Colors.white));
+        }
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
-              width: 20, height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          );
         }
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return const Text("💰 0 P", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white));
+          return const Text("내 포인트: 💰 0 P",
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white));
         }
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final points = data['point'] ?? 0;
-        return Text("💰 $points P", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white));
+        return Text("💰 $points P",
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white));
       },
     );
   }
 }
 
+// ---------------------------------------------------------
+// [메인 화면]
+// ---------------------------------------------------------
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -63,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 1. 사이드 메뉴 (Drawer)
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -73,7 +141,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const Text('환영합니다', style: TextStyle(color: Colors.white, fontSize: 18)),
+                  // [수정됨] 닉네임 표시 위젯 적용
+                  const DrawerNicknameDisplay(),
+
+                  // 포인트 표시 위젯
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8.0, top: 4.0),
                     child: RealtimePointDisplay(),
@@ -81,46 +152,67 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            // 내 프로필 -> 마이페이지 이동
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text('내 프로필'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context); // 서랍 닫기
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MyPageScreen()),
+                );
+              },
             ),
+            // 상점 이동
             ListTile(
               leading: const Icon(Icons.store),
               title: const Text('상점'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ShopScreen()),
+                );
               },
             ),
+            // 커뮤니티 이동
             ListTile(
               leading: const Icon(Icons.group),
               title: const Text('우리 학교 커뮤니티'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CommunityScreen()),
+                );
               },
             ),
           ],
         ),
       ),
+
+      // 2. 상단 앱바
       appBar: AppBar(
-        title: const Text('EcoRecycle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('EcoRecycle',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
+
+      // 3. 메인 내용 (본문)
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SproutSection(),
+              const SproutSection(), // 캐릭터 & 환영문구 (여기도 수정하셨죠?)
               const SizedBox(height: 16),
               const TipMenu(),
               const SizedBox(height: 16),
-              const Text("분리배출 꿀팁 영상", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text("분리배출 꿀팁 영상",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
 
               SizedBox(
@@ -137,7 +229,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ListView(
                       controller: _scrollController,
                       scrollDirection: Axis.horizontal,
-                      // ★★★ 여기 'children: const [...]'에서 'const'를 제거했습니다! ★★★
                       children: const [
                         SizedBox(
                           width: 200,
@@ -171,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               const EcoParticipationSection(),
               const SizedBox(height: 16),
-              const CertSection(),
+              CertSection(),
               const SizedBox(height: 16),
               const QuizSection(),
               const SizedBox(height: 80),
@@ -179,6 +270,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+
+      // 4. 플로팅 버튼 (챗봇)
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -189,6 +282,8 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.green,
         child: const Icon(Icons.chat_bubble, color: Colors.white),
       ),
+
+      // 5. 하단 네비게이션 바
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 6.0,
@@ -197,12 +292,28 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              IconButton(icon: const Icon(Icons.home), color: Colors.green, onPressed: () {}, iconSize: 28),
+              // 홈 버튼
+              IconButton(
+                icon: const Icon(Icons.home),
+                color: Colors.green,
+                onPressed: () {
+                  _scrollController.animateTo(0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut);
+                },
+                iconSize: 28,
+              ),
+              // 카메라 버튼
               ElevatedButton(
                 onPressed: () async {
                   final cameras = await availableCameras();
                   if (context.mounted) {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => AiCameraScreen(cameras: cameras)));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AiCameraScreen(cameras: cameras),
+                      ),
+                    );
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -213,16 +324,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: const Icon(Icons.camera_alt, size: 28, color: Colors.white),
               ),
+              // [마이페이지 버튼]
               IconButton(
-                  icon: const Icon(Icons.people),
-                  color: Colors.grey,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CommunityScreen()),
-                    );
-                  },
-                  iconSize: 28
+                icon: const Icon(Icons.person),
+                color: Colors.grey,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MyPageScreen()),
+                  );
+                },
+                iconSize: 28,
               ),
             ],
           ),
