@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class ShopScreen extends StatefulWidget {
+  const ShopScreen({super.key});
+
+  @override
+  State<ShopScreen> createState() => _ShopScreenState();
+}
+
+class _ShopScreenState extends State<ShopScreen> {
+  // 현재 상단에 표시될 이미지
+  String topImage = 'assets/sprout.png';
+
+  // 현재 착용 중인 드레스 인덱스 (-1이면 착용 안 함)
+  int currentEquippedIndex = -1;
+
+  // 아이템 데이터
+  final List<Map<String, dynamic>> sprays = [
+    {'image': 'assets/spray1.png', 'price': 100, 'growth': '8%'},
+    {'image': 'assets/spray2.png', 'price': 200, 'growth': '10%'},
+    {'image': 'assets/spray3.png', 'price': 300, 'growth': '12%'},
+  ];
+
+  final List<Map<String, dynamic>> dresses = [
+    {'image': 'assets/dress1.png', 'price': 300, 'name': '스트로베리 드레스업'},
+    {'image': 'assets/dress2.png', 'price': 300, 'name': '허니벌 드레스업'},
+    {'image': 'assets/dress3.png', 'price': 400, 'name': '외계뿅뿅 드레스업'},
+    {'image': 'assets/dress4.png', 'price': 150, 'name': '퐁실니트 드레스업'},
+  ];
+
+  // 구매 상태 관리 (앱 끄면 초기화됨 - 발표용)
+  late List<bool> sprayPurchased;
+  late List<bool> dressOwned;
+
+  // 로그인 유저 정보
+  final user = FirebaseAuth.instance.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    sprayPurchased = List<bool>.filled(sprays.length, false);
+    dressOwned = List<bool>.filled(dresses.length, false);
+  }
+
+  // ★ [핵심] Firebase에서 포인트 차감하는 함수
+  Future<bool> _deductPoints(int price) async {
+    if (user == null) return false;
+
+    try {
+      // 1. 현재 내 점수 가져오기 (DB 조회)
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user!.uid);
+      final doc = await docRef.get();
+
+      if (!doc.exists) return false;
+
+      int currentPoints = doc.data()?['point'] ?? 0;
+
+      // 2. 점수가 충분한지 확인
+      if (currentPoints >= price) {
+        // 3. 점수 차감하고 업데이트
+        await docRef.update({'point': currentPoints - price});
+        return true; // 구매 성공
+      } else {
+        return false; // 잔액 부족
+      }
+    } catch (e) {
+      print("구매 오류: $e");
+      return false;
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 1)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Custom Shop', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.green,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Column(
+        children: [
+          // 1. 상단 미리보기 + 포인트 표시 영역
+          Container(
+            width: double.infinity,
+            height: 180,
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Row(
+              children: [
+                // 초기화 버튼
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.grey),
+                        tooltip: '초기화',
+                        onPressed: () {
+                          setState(() {
+                            topImage = 'assets/sprout.png';
+                            currentEquippedIndex = -1;
+                          });
+                          _showSnackBar('착용 상태가 초기화되었습니다.');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                // 중앙 이미지
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Image.asset(topImage, fit: BoxFit.contain),
+                  ),
+                ),
+                // ★ [핵심] 현재 포인트 (StreamBuilder로 실시간 연동)
+                Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('MY POINT', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || !snapshot.data!.exists) {
+                            return const Text("0 P", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green));
+                          }
+                          final data = snapshot.data!.data() as Map<String, dynamic>;
+                          final myPoint = data['point'] ?? 0;
+
+                          return Text(
+                            "$myPoint P",
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 2. 분무기 리스트
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 160,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: sprays.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final spray = sprays[index];
+                final int price = spray['price'];
+                final bool isBought = sprayPurchased[index];
+
+                return Container(
+                  width: 110,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(spray['image'], height: 50, fit: BoxFit.contain),
+                      const SizedBox(height: 8),
+                      Text('$price P', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isBought ? Colors.grey : Colors.green,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(80, 30),
+                        ),
+                        onPressed: isBought ? null : () async {
+                          // ★ 구매 로직
+                          bool success = await _deductPoints(price);
+                          if (success) {
+                            setState(() { sprayPurchased[index] = true; });
+                            _showSnackBar('영양제를 구매했습니다!');
+                          } else {
+                            _showSnackBar('포인트가 부족합니다!');
+                          }
+                        },
+                        child: Text(isBought ? '완료' : '구매'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 3. 드레스 리스트
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: dresses.length,
+              itemBuilder: (context, index) {
+                final dress = dresses[index];
+                final int price = dress['price'];
+                final bool isOwned = dressOwned[index];
+                final bool isEquipped = currentEquippedIndex == index;
+
+                String btnText = !isOwned ? '$price P 구매' : (isEquipped ? '착용 중' : '착용하기');
+                Color btnColor = !isOwned ? Colors.green : (isEquipped ? Colors.grey : Colors.orange);
+
+                return GestureDetector(
+                  onTap: () { setState(() { topImage = dress['image']; }); },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isEquipped ? Border.all(color: Colors.orange, width: 2) : Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Image.asset(dress['image'], fit: BoxFit.contain),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            children: [
+                              Text(dress['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 6),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: btnColor, foregroundColor: Colors.white, minimumSize: const Size(100, 32)),
+                                onPressed: isEquipped ? null : () async {
+                                  if (!isOwned) {
+                                    // ★ 구매 시도
+                                    bool success = await _deductPoints(price);
+                                    if (success) {
+                                      setState(() { dressOwned[index] = true; });
+                                      _showSnackBar('${dress['name']} 구매 완료!');
+                                    } else {
+                                      _showSnackBar('포인트가 부족합니다!');
+                                    }
+                                  } else {
+                                    // 착용
+                                    setState(() {
+                                      currentEquippedIndex = index;
+                                      topImage = dress['image'];
+                                    });
+                                    _showSnackBar('아이템을 착용했습니다.');
+                                  }
+                                },
+                                child: Text(btnText, style: const TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}

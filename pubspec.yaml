@@ -1,0 +1,53 @@
+name: Ecorecycle
+description: "AI 기반 재활용 분류 앱"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.3
+  path_provider: ^2.0.15
+  tflite_flutter: ^0.12.1
+  image: ^4.5.4
+  permission_handler: ^11.0.0
+
+  image_picker: ^1.1.0
+
+
+  firebase_core: ^3.0.0
+  cloud_firestore: ^5.0.0
+  firebase_storage: ^12.0.0
+
+  youtube_player_flutter: ^9.1.0
+
+  # 지도 관련 패키지
+  geolocator: ^9.0.2
+  shared_preferences: ^2.2.1
+  google_maps_flutter: ^2.3.1
+  geocoding: ^2.1.0
+  firebase_auth: ^5.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sprout.png
+    - assets/spray1.png
+    - assets/spray2.png
+    - assets/spray3.png
+    - assets/dress1.png
+    - assets/dress2.png
+    - assets/dress3.png
+    - assets/dress4.png
+    - assets/quiz.png
+    - assets/model_unquant.tflite
+    - assets/labels.txt
