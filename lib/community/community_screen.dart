@@ -1,35 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'hall_of_fame.dart'; // 명예의 전당 위젯 import
+import 'class_board.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
 
-  @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
-}
+  // [핵심] 입장 권한 체크 함수
+  Future<void> _checkAccessAndEnter(BuildContext context, int targetGrade, int targetClass) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-class _CommunityScreenState extends State<CommunityScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    // 1. 내 정보 가져오기
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (!userDoc.exists) return;
 
-  // 1. 전체 랭킹 데이터 (기존 데이터 유지)
-  final List<Map<String, dynamic>> classRanking = [
-    {"name": "1학년 1반", "points": 1850},
-    {"name": "3학년 2반", "points": 1620},
-    {"name": "2학년 5반", "points": 1450},
-    {"name": "1학년 3반", "points": 980},
-    {"name": "2학년 1반", "points": 850},
-  ];
+    final data = userDoc.data() as Map<String, dynamic>;
+    final myGrade = data['grade'] ?? 0;       // 내 학년
+    final myClass = data['classNumber'] ?? 0; // 내 반
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+    // 2. 비교하기 (2학년 2반만 들어갈 수 있게 하려면)
+    if (myGrade == targetGrade && myClass == targetClass) {
+      // 입장 성공! (여기에 실제 게시판 화면으로 이동하는 코드 넣기)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("$targetGrade학년 $targetClass반 커뮤니티에 입장했습니다! 👋")),
+      );
+      if (myGrade == targetGrade && myClass == targetClass) {
+        // 입장 성공! 게시판 화면으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClassBoardScreen(
+                grade: targetGrade,
+                classNumber: targetClass
+            ),
+          ),
+        );
+      }
+      else {
+      }
+    } else {
+      // 입장 거부 알림
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("입장 불가 🚫"),
+          content: Text("본인의 학급($myGrade학년 $myClass반)만 입장할 수 있습니다.\n여기는 $targetGrade학년 $targetClass반입니다."),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("확인"))
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -38,182 +61,57 @@ class _CommunityScreenState extends State<CommunityScreen>
       appBar: AppBar(
         title: const Text("우리 학교 커뮤니티", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: "🏫 학급 찾기"), // 카테고리 탭
-            Tab(text: "🏆 명예의 전당"), // 랭킹 탭
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // 1. 명예의 전당 (TOP 3) - 아까 만든 위젯
+            const HallOfFameSection(),
+            const SizedBox(height: 20),
+            const Divider(thickness: 5, color: Color(0xFFF5F5F5)),
+            const SizedBox(height: 10),
+
+            // 2. 학급 리스트 (예시: 2학년의 반들)
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("🏫 우리 반 게시판 찾기", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+
+                  // 예시: 2학년 1반 ~ 4반 버튼
+                  _buildClassTile(context, 2, 1),
+                  _buildClassTile(context, 2, 2), // 내가 2-2라면 여기만 들어가지겠죠?
+                  _buildClassTile(context, 2, 3),
+                  _buildClassTile(context, 2, 4),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildClassCategoryTab(), // 학년/반 카테고리 화면
-          _buildRankingTab(),       // 랭킹 화면
-        ],
-      ),
     );
   }
 
-  // ----------------------------------------------------------------
-  // 1. 학년/반 카테고리 탭 (요청하신 기능)
-  // ----------------------------------------------------------------
-  Widget _buildClassCategoryTab() {
-    // 1~3학년 생성
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 6, // 1학년 ~ 6학년
-      itemBuilder: (context, gradeIndex) {
-        int grade = gradeIndex + 1; // 학년 (1 ~ 6)
-
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ExpansionTile(
-            // 카테고리 제목 (학년)
-            leading: CircleAvatar(
-              backgroundColor: Colors.green[100],
-              child: Text("$grade", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            ),
-            title: Text("$grade학년", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            childrenPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-
-            // 카테고리 내부 (1반 ~ 6반 리스트)
-            children: List.generate(6, (classIndex) {
-              int classNum = classIndex + 1; // 반 (1~6)
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                leading: const Icon(Icons.class_outlined, color: Colors.grey),
-                title: Text("$grade학년 $classNum반", style: const TextStyle(fontSize: 16)),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                onTap: () {
-                  // 반을 누르면 해당 반 게시판으로 이동
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ClassBoardScreen(grade: grade, classNum: classNum),
-                    ),
-                  );
-                },
-              );
-            }),
-          ),
-        );
-      },
-    );
-  }
-
-  // ----------------------------------------------------------------
-  // 2. 전체 랭킹 탭 (기존 기능 유지)
-  // ----------------------------------------------------------------
-  Widget _buildRankingTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: classRanking.length,
-      itemBuilder: (context, index) {
-        final item = classRanking[index];
-        Color rankColor;
-        if (index == 0) rankColor = const Color(0xFFFFD700);
-        else if (index == 1) rankColor = const Color(0xFFC0C0C0);
-        else if (index == 2) rankColor = const Color(0xFFCD7F32);
-        else rankColor = Colors.green;
-
-        return Card(
-          elevation: 3,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: rankColor,
-              foregroundColor: Colors.white,
-              child: Text("${index + 1}", style: const TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            title: Text("${item['name']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: Text("${item['points']} P", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ----------------------------------------------------------------
-// [추가] 상세 반 게시판 화면 (반을 클릭했을 때 나오는 화면)
-// ----------------------------------------------------------------
-class ClassBoardScreen extends StatelessWidget {
-  final int grade;
-  final int classNum;
-
-  const ClassBoardScreen({super.key, required this.grade, required this.classNum});
-
-  @override
-  Widget build(BuildContext context) {
-    // 예시 공지사항 데이터
-    final List<Map<String, String>> notices = [
-      {"title": "📢 이번 주 청소 구역 안내", "content": "1분단: 교실 / 2분단: 복도 / 3분단: 특별구역"},
-      {"title": "♻️ 페트병 뚜껑 모으기 캠페인", "content": "이번 달 말까지 페트병 뚜껑 100개 모으면 학급 포인트 지급!"},
-      {"title": "🗓️ 중간고사 일정 안내", "content": "다음 주 수요일부터 3일간 중간고사가 진행됩니다."},
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("$grade학년 $classNum반 게시판"),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          // 상단 반 정보 카드
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: Colors.green[50],
-            child: Column(
-              children: [
-                const Icon(Icons.groups, size: 50, color: Colors.green),
-                const SizedBox(height: 10),
-                Text(
-                  "$grade학년 $classNum반에 오신 것을 환영합니다! 👋",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 5),
-                const Text("오늘도 깨끗한 지구를 위해 힘내봐요!", style: TextStyle(color: Colors.black54)),
-              ],
-            ),
-          ),
-
-          // 공지사항 리스트
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: notices.length,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const Icon(Icons.campaign, color: Colors.orange),
-                    title: Text(notices[index]['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(notices[index]['content']!),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("글쓰기 기능은 준비 중입니다!")),
-          );
+  // 반 버튼 디자인
+  Widget _buildClassTile(BuildContext context, int grade, int classNum) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.green[100],
+          child: Text("$classNum", style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.bold)),
+        ),
+        title: Text("$grade학년 $classNum반"),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          // 버튼 누르면 권한 체크 함수 실행
+          _checkAccessAndEnter(context, grade, classNum);
         },
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }

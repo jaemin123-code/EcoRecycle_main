@@ -102,8 +102,22 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
   }
 
+  // 3. 답변 생성 로직 (업그레이드 버전)
   String _generateBotResponse(String input) {
-    // (1) 포인트 질문 -> DB에서 가져온 _currentPoints 값을 보여줌
+    // 사용자가 입력한 문장에 포함된 단어를 기준으로 답변을 찾습니다.
+
+    // (0) 기본 인사 및 감성 대화
+    if (input.contains("안녕") || input.contains("반가")) {
+      return "안녕하세요! 오늘도 지구를 지키러 오셨군요! 🌱\n무엇을 도와드릴까요?";
+    }
+    if (input.contains("고마") || input.contains("감사")) {
+      return "별말씀을요! 에코리사이클과 함께해주셔서 감사합니다. 💚";
+    }
+    if (input.contains("누구") || input.contains("소개")) {
+      return "저는 여러분의 분리배출을 돕는 AI 상담사 '에코봇'입니다! 🤖";
+    }
+
+    // (1) 포인트 질문
     if (input.contains("포인트") || input.contains("점수")) {
       if (_isLoading) {
         return "잠시만요, 포인트 장부를 확인하고 있어요... 📖";
@@ -111,24 +125,39 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       return "현재 회원님의 환경 포인트는\n총 $_currentPoints P 입니다! 🌱";
     }
 
-    // ... 기존 로직 그대로 유지 ...
-    else if (input.contains("플라스틱")) {
+    // (2) 플라스틱 (페트병 포함)
+    else if (input.contains("플라스틱") || input.contains("페트") || input.contains("pet")) {
       return _formatGuide(recycleData[0]);
-    } else if (input.contains("종이") || input.contains("박스")) {
+    }
+    // (3) 종이/박스
+    else if (input.contains("종이") || input.contains("박스") || input.contains("책") || input.contains("신문")) {
       return _formatGuide(recycleData[1]);
-    } else if (input.contains("캔") || input.contains("유리") || input.contains("병")) {
+    }
+    // (4) 캔/유리
+    else if (input.contains("캔") || input.contains("유리") || input.contains("병") || input.contains("통조림")) {
       return _formatGuide(recycleData[2]);
-    } else if (input.contains("비닐")) {
+    }
+    // (5) 비닐 (뽁뽁이 포함)
+    else if (input.contains("비닐") || input.contains("뽁뽁이") || input.contains("필름")) {
       if (recycleData.length > 3) return _formatGuide(recycleData[3]);
-      return "🥡 [비닐류 배출 팁]\n\n• 깨끗이 씻어서 투명 봉투에 담아주세요.";
-    } else if (input.contains("스티로폼")) {
-      return "📦 [스티로폼 배출 팁]\n\n• 흰색만 가능! 테이프/송장 제거 필수.";
-    } else if (input.contains("건전지")) {
-      return "🔋 [건전지 배출 주의]\n\n• 반드시 전용 수거함에 버려주세요.";
-    } else if (input.contains("음식물")) {
-      return "🍎 [음식물 쓰레기 기준]\n\n• 동물이 먹을 수 있으면 음식물!\n• 뼈, 껍데기, 씨앗은 일반쓰레기입니다.";
-    } else {
-      return "죄송해요, 잘 모르는 내용이에요. 😢\n'포인트', '플라스틱' 처럼 단어로 물어봐 주세요.";
+      return "🥡 [비닐류 배출 팁]\n\n• 음식물 등 이물질을 깨끗이 씻어주세요.\n• 흩날리지 않게 투명 봉투에 담아 배출!\n• 스티커가 붙은 비닐은 제거하거나 일반쓰레기로 버려주세요.";
+    }
+    // (6) 스티로폼
+    else if (input.contains("스티로폼") || input.contains("스펀지")) {
+      return "📦 [스티로폼 배출 팁]\n\n• 흰색 스티로폼만 배출 가능합니다.\n• 테이프와 운송장 스티커는 완전히 제거해주세요.\n• 코팅된 유색 스티로폼이나 과일 포장망은 종량제 봉투에 버려주세요!";
+    }
+    // (7) 건전지/형광등
+    else if (input.contains("건전지") || input.contains("배터리") || input.contains("형광등")) {
+      return "🔋 [유해 폐기물 주의]\n\n건전지와 형광등은 일반 쓰레기가 아닙니다!\n화재 및 환경 오염 위험이 있으니 반드시 아파트나 주민센터의 '전용 수거함'에 넣어주세요.";
+    }
+    // (8) 음식물
+    else if (input.contains("음식물") || input.contains("뼈") || input.contains("껍질")) {
+      return "🍎 [음식물 쓰레기 기준]\n\n• 동물이 먹을 수 있으면 음식물, 아니면 일반쓰레기!\n• 뼈(치킨/족발), 조개껍데기, 달걀껍질, 딱딱한 씨앗은 '일반쓰레기'입니다.";
+    }
+
+    // 그 외 모르는 질문
+    else {
+      return "죄송해요, 아직 배우고 있는 중이라 잘 모르겠어요. 😢\n'플라스틱', '캔', '안녕' 처럼 핵심 단어로 물어봐 주시겠어요?";
     }
   }
 

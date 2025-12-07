@@ -1,14 +1,17 @@
-// 파일 위치: lib/guide/recycle_data.dart
 import 'package:flutter/material.dart';
-import 'recycle_model.dart'; // 같은 폴더에 있으니 바로 import 가능
+// [중요] 귀여운 아이콘 패키지 import
+import 'package:material_symbols_icons/symbols.dart';
+import 'recycle_model.dart';
 
 final List<RecycleGuide> recycleData = [
+  // 1. 플라스틱
   RecycleGuide(
     id: 'plastic',
     title: '플라스틱류',
     subTitle: '내용물은 비우고, 라벨은 떼고!',
     themeColor: Colors.blueAccent,
-    icon: Icons.local_drink,
+    // [변경] 물병 모양 아이콘 (둥글고 꽉 찬 스타일)
+    icon: Symbols.water_bottle_rounded,
     steps: ['내용물 비우기', '이물질 헹구기', '라벨/뚜껑 분리', '압축하여 배출'],
     possibleItems: [
       RecycleItem(name: '투명 페트병', description: '라벨 제거 후 찌그러트리기'),
@@ -21,12 +24,15 @@ final List<RecycleGuide> recycleData = [
       RecycleItem(name: '음식물 묻은 용기', description: '고추기름 등 얼룩이 남은 것'),
     ],
   ),
+
+  // 2. 종이류
   RecycleGuide(
     id: 'paper',
     title: '종이류',
     subTitle: '젖지 않게, 코팅된 건 제외하고!',
     themeColor: const Color(0xFFD4A373),
-    icon: Icons.inventory_2,
+    // [변경] 신문지 모양 아이콘
+    icon: Symbols.newspaper_rounded,
     steps: ['테이프 제거', '철심/스프링 제거', '납작하게 펼치기', '물기 주의'],
     possibleItems: [
       RecycleItem(name: '신문지/책', description: '스프링 노트는 스프링 제거'),
@@ -39,12 +45,15 @@ final List<RecycleGuide> recycleData = [
       RecycleItem(name: '코팅 전단지', description: '비닐 코팅막 때문에 불가'),
     ],
   ),
+
+  // 3. 유리/캔
   RecycleGuide(
     id: 'glass_can',
     title: '유리병·캔류',
     subTitle: '깨지지 않게 조심! 이물질은 쏙!',
     themeColor: Colors.teal,
-    icon: Icons.wine_bar,
+    // [변경] 유리잔 모양 아이콘
+    icon: Symbols.glass_cup_rounded,
     steps: ['담배꽁초 등 이물질 X', '내용물 헹구기', '뚜껑 별도 배출', '파손 주의'],
     possibleItems: [
       RecycleItem(name: '음료수/맥주병', description: '내용물 비우고 뚜껑 제거'),
@@ -57,13 +66,15 @@ final List<RecycleGuide> recycleData = [
       RecycleItem(name: '도자기/사기그릇', description: '유리병과 녹는점 다름'),
     ],
   ),
-  // 비닐 등 추가 가능
+
+  // 4. 비닐류 (데이터 추가 예시)
   RecycleGuide(
     id: 'vinyl',
     title: '비닐류',
     subTitle: '깨끗한 비닐만 모아서!',
     themeColor: Colors.purpleAccent,
-    icon: Icons.shopping_bag,
+    // [변경] 쇼핑백 모양 아이콘
+    icon: Symbols.shopping_bag_rounded,
     steps: ['이물질 제거', '물기 제거', '흩날리지 않게', '봉투에 담기'],
     possibleItems: [
       RecycleItem(name: '깨끗한 비닐', description: '투명/불투명 봉투'),
@@ -74,13 +85,15 @@ final List<RecycleGuide> recycleData = [
       RecycleItem(name: '스티커 붙은 비닐', description: '제거 안 되면 일반쓰레기'),
     ],
   ),
-  // 기타/일반쓰레기 추가
+
+  // 5. 일반쓰레기
   RecycleGuide(
     id: 'trash',
     title: '일반쓰레기',
     subTitle: '재활용 안 되는 건 여기로!',
     themeColor: Colors.grey,
-    icon: Icons.delete_outline,
+    // [변경] 쓰레기통 모양 아이콘
+    icon: Symbols.delete_rounded,
     steps: ['종량제 봉투', '물기 제거', '날카로운 것 주의', '꽉 묶어서'],
     possibleItems: [
       RecycleItem(name: '휴지/물티슈', description: '재활용 절대 불가'),
