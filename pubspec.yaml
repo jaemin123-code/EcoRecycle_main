@@ -31,7 +31,7 @@ dependencies:
   geocoding: ^2.1.0
   firebase_auth: ^5.7.0
   material_symbols_icons: ^4.2892.0
-  google_generative_ai: ^0.4.5
+  google_generative_ai: ^0.4.7
 
 dev_dependencies:
   flutter_test:
