@@ -97,7 +97,7 @@ class HallOfFameSection extends StatelessWidget {
               children: [
                 // TOP 3 카드
                 Container(
-                  height: 210,
+                  height: 220,
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
                     color: Colors.white,
