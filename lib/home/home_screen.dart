@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:camera/camera.dart';
-// [중요] 귀여운 아이콘 패키지 import
 import 'package:material_symbols_icons/symbols.dart';
 
+// 👇 파일 경로가 다르면 빨간 줄이 뜰 수 있습니다. 본인 프로젝트 경로에 맞게 수정해주세요.
 import '../mypage/mypage_screen.dart';
 import '../widgets/shorts_tips_widget.dart';
-import '../chat/chatbot_screen.dart';
+import '../chat/chatbot_screen.dart'; // 챗봇 화면 import
 import '../community/community_screen.dart';
 import '../camera/ai_camera_screen.dart';
 import '../widgets/sprout_section.dart';
 import '../widgets/tip_menu.dart';
-import '../cert/cert_section.dart'; // 인증하기 버튼 위젯
+import '../cert/cert_section.dart';
 import 'quiz_section.dart';
 import 'eco_participation.dart';
 import '../shop/shop_screen.dart';
+
 
 // ---------------------------------------------------------
 // [위젯 1] 사이드 메뉴 닉네임
@@ -71,7 +72,7 @@ class RealtimePointDisplay extends StatelessWidget {
 }
 
 // ---------------------------------------------------------
-// [메인 화면]
+// [메인 화면 클래스]
 // ---------------------------------------------------------
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Symbols.person_rounded), // 둥근 아이콘
+              leading: const Icon(Symbols.person_rounded),
               title: const Text('내 프로필'),
               onTap: () {
                 Navigator.pop(context);
@@ -120,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Symbols.store_rounded), // 둥근 아이콘
+              leading: const Icon(Symbols.store_rounded),
               title: const Text('상점'),
               onTap: () {
                 Navigator.pop(context);
@@ -128,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Symbols.group_rounded), // 둥근 아이콘
+              leading: const Icon(Symbols.group_rounded),
               title: const Text('우리 학교 커뮤니티'),
               onTap: () {
                 Navigator.pop(context);
@@ -146,29 +147,27 @@ class _HomeScreenState extends State<HomeScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
 
-      // 3. 메인 내용
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SproutSection(),
-              const SizedBox(height: 16),
-              const TipMenu(),
-              const SizedBox(height: 16),
-              const Text("분리배출 꿀팁 영상", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+      // 3. 메인 내용 (Stack 구조)
+      body: Stack(
+        children: [
+          // (1) 기존 화면 내용 (맨 밑바닥)
+          SingleChildScrollView(
+            controller: _scrollController,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SproutSection(),
+                  const SizedBox(height: 16),
+                  const TipMenu(),
+                  const SizedBox(height: 16),
+                  const Text("분리배출 꿀팁 영상", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
 
-              SizedBox(
-                height: 400,
-                child: Scrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: true,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 15.0),
+                  SizedBox(
+                    height: 400,
                     child: ListView(
-                      controller: _scrollController,
                       scrollDirection: Axis.horizontal,
                       children: const [
                         SizedBox(width: 200, child: ShortsTipsWidget(videoId: 'jBmjwMbgcQ8', title: '분리수거 간단한 팁')),
@@ -179,75 +178,90 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 16),
-              const EcoParticipationSection(),
-              const SizedBox(height: 16),
-              CertSection(), // const 제거됨
-              const SizedBox(height: 16),
-              const QuizSection(),
-              const SizedBox(height: 80),
-            ],
+                  const SizedBox(height: 16),
+                  const EcoParticipationSection(),
+                  const SizedBox(height: 16),
+                  const CertSection(),
+                  const SizedBox(height: 16),
+                  const QuizSection(),
+                  const SizedBox(height: 80), // 하단 여백
+                ],
+              ),
+            ),
           ),
+
+          // (2) 챗봇 버튼 (화면 오른쪽 아래에 고정)
+          Positioned(
+            bottom: 20, // 바닥에서 20만큼 위
+            right: 20,  // 오른쪽에서 20만큼 안쪽
+            child: FloatingActionButton(
+              heroTag: "chatbot",
+              backgroundColor: const Color(0xFF4CAF50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+              onPressed: () {
+                // 👇 클래스 이름 확인 필수 (ChatbotScreen)
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatbotScreen()));
+              },
+            ),
+          ),
+        ],
+      ),
+
+      // 4. 플로팅 버튼 (가운데 카메라)
+      floatingActionButton: SizedBox(
+        width: 70,
+        height: 70,
+        child: FloatingActionButton(
+          onPressed: () async {
+            try {
+              final cameras = await availableCameras();
+              if (context.mounted) {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => AiCameraScreen(cameras: cameras)));
+              }
+            } catch (e) {
+              print("카메라 에러: $e");
+            }
+          },
+          backgroundColor: Colors.green,
+          shape: const CircleBorder(),
+          elevation: 4.0,
+          child: const Icon(Symbols.photo_camera_rounded, size: 32, color: Colors.white),
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked, // 위치 고정
 
-      // 4. 플로팅 버튼 (챗봇)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatbotScreen()));
-        },
-        backgroundColor: Colors.green,
-        // 아이콘 변경: 둥근 말풍선
-        child: const Icon(Symbols.chat_bubble_rounded, color: Colors.white, weight: 600),
-      ),
-
-      // 5. 하단 네비게이션 바 (아이콘 대폭 업그레이드!)
+      // 5. 하단 네비게이션 바
       bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6.0,
+        shape: const CircularNotchedRectangle(), // 가운데 파내기
+        notchMargin: 8.0,
+        color: Colors.white,
         child: SizedBox(
           height: 60,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // [홈] 둥근 집 모양, weight(두께) 600으로 통통하게
               IconButton(
                 icon: const Icon(Symbols.home_rounded, weight: 600),
                 color: Colors.green,
+                iconSize: 32,
                 onPressed: () {
                   _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
                 },
-                iconSize: 32,
               ),
 
-              // [카메라] 둥근 렌즈 모양
-              ElevatedButton(
-                onPressed: () async {
-                  final cameras = await availableCameras();
-                  if (context.mounted) {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => AiCameraScreen(cameras: cameras)));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: const CircleBorder(),
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.all(14),
-                  elevation: 4,
-                ),
-                child: const Icon(Symbols.photo_camera_rounded, size: 30, color: Colors.white),
-              ),
+              const SizedBox(width: 40), // 가운데 공간 확보
 
-              // [마이페이지] 둥근 사람 모양
               IconButton(
                 icon: const Icon(Symbols.person_rounded, weight: 600),
                 color: Colors.grey,
+                iconSize: 32,
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const MyPageScreen()));
                 },
-                iconSize: 32,
               ),
             ],
           ),

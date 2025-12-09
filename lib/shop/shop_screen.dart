@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// ★ [추가] 움직이는 캐릭터 위젯 불러오기
+import '../character/animated_mascot.dart';
+
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
 
@@ -30,7 +33,7 @@ class _ShopScreenState extends State<ShopScreen> {
     {'image': 'assets/dress4.png', 'price': 150, 'name': '퐁실니트 드레스업'},
   ];
 
-  // 구매 상태 관리 (앱 끄면 초기화됨 - 발표용)
+  // 구매 상태 관리
   late List<bool> sprayPurchased;
   late List<bool> dressOwned;
 
@@ -44,14 +47,13 @@ class _ShopScreenState extends State<ShopScreen> {
     dressOwned = List<bool>.filled(dresses.length, false);
   }
 
-  // ★ [수정됨] 포인트 차감 + 사용 내역 저장 함수
+  // 포인트 차감 + 사용 내역 저장 함수
   Future<bool> _deductPoints(int price, String itemName) async {
     if (user == null) return false;
 
     try {
       final docRef = FirebaseFirestore.instance.collection('users').doc(user!.uid);
 
-      // 트랜잭션 사용 (안전하게 처리)
       return await FirebaseFirestore.instance.runTransaction((transaction) async {
         final snapshot = await transaction.get(docRef);
 
@@ -63,14 +65,18 @@ class _ShopScreenState extends State<ShopScreen> {
           // 1. 포인트 차감
           transaction.update(docRef, {'point': currentPoints - price});
 
-          // 2. [추가됨] 사용 내역 기록 (마이페이지 연동용)
-          final historyRef = FirebaseFirestore.instance.collection('point_history').doc();
+          // 2. 사용 내역 기록 (수정할 부분)
+          // ★★★ 사용자 문서 아래의 point_history 서브컬렉션에 기록하도록 수정 ★★★
+          final historyRef = FirebaseFirestore.instance
+              .collection('users').doc(user!.uid) // users/{uid} 문서
+              .collection('point_history').doc(); // 그 아래 point_history 서브컬렉션
+
           transaction.set(historyRef, {
             'uid': user!.uid,
             'amount': price,
-            'description': itemName, // 상품명 저장
-            'type': 'use', // 사용
-            'timestamp': FieldValue.serverTimestamp(),
+            'description': itemName,
+            'type': 'use',
+            'date': FieldValue.serverTimestamp(), // 'timestamp'를 'date'로 통일 (마이페이지 로직에 맞춤)
           });
 
           return true; // 성공
@@ -132,13 +138,19 @@ class _ShopScreenState extends State<ShopScreen> {
                     ],
                   ),
                 ),
-                // 중앙 이미지
+
+                // ★ [수정됨] 중앙 이미지 -> 움직이는 캐릭터로 교체!
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: Image.asset(topImage, fit: BoxFit.contain),
+                    child: AnimatedMascot(
+                      imagePath: topImage, // 현재 선택된 이미지 경로 전달
+                      width: 150,          // 크기 적절히 조절
+                      height: 150,
+                    ),
                   ),
                 ),
+
                 // 포인트 표시 (실시간 연동)
                 Padding(
                   padding: const EdgeInsets.only(right: 20),
@@ -181,7 +193,7 @@ class _ShopScreenState extends State<ShopScreen> {
               itemBuilder: (context, index) {
                 final spray = sprays[index];
                 final int price = spray['price'];
-                final String name = spray['name'] ?? '영양제'; // 이름 없을 경우 대비
+                final String name = spray['name'] ?? '영양제';
                 final bool isBought = sprayPurchased[index];
 
                 return Container(
@@ -205,7 +217,6 @@ class _ShopScreenState extends State<ShopScreen> {
                           minimumSize: const Size(80, 30),
                         ),
                         onPressed: isBought ? null : () async {
-                          // ★ [수정됨] 이름도 같이 넘겨줍니다.
                           bool success = await _deductPoints(price, name);
                           if (success) {
                             setState(() { sprayPurchased[index] = true; });
@@ -273,7 +284,6 @@ class _ShopScreenState extends State<ShopScreen> {
                                 style: ElevatedButton.styleFrom(backgroundColor: btnColor, foregroundColor: Colors.white, minimumSize: const Size(100, 32)),
                                 onPressed: isEquipped ? null : () async {
                                   if (!isOwned) {
-                                    // ★ [수정됨] 이름도 같이 넘겨줍니다.
                                     bool success = await _deductPoints(price, name);
                                     if (success) {
                                       setState(() { dressOwned[index] = true; });
@@ -282,7 +292,6 @@ class _ShopScreenState extends State<ShopScreen> {
                                       _showSnackBar('포인트가 부족합니다!');
                                     }
                                   } else {
-                                    // 착용
                                     setState(() {
                                       currentEquippedIndex = index;
                                       topImage = dress['image'];
