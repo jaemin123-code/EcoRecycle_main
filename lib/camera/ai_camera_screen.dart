@@ -112,6 +112,12 @@ class _AiCameraScreenState extends State<AiCameraScreen> {
           else if (key.contains('plastic') || key.contains('mouse')) {
              _guideMessage = "💡 플라스틱 발견!\n👉 이물질을 제거하고 [플라스틱]으로 배출해주세요.";
           } 
+          else if (key.contains('box') || key.contains('cardboard') || key.contains('carton')) {
+             _guideMessage = "💡 박스/상자 발견!\n👉 테이프와 운송장(택배 스티커)을 꼭 떼어내고,\n👉 납작하게 펼쳐서 [종이]로 배출해주세요.";
+          }
+          else if (key.contains('paper') || key.contains('book') || key.contains('newspaper')) {
+             _guideMessage = "💡 종이류 발견!\n👉 물에 젖지 않게 주의하고,\n👉 스프링이나 코팅된 표지, 비닐은 제거 후 [종이]로 배출해주세요.";
+          }
           else {
             // 그 외의 물건일 때
             _guideMessage = "💡 분리배출 표시를 확인해주세요.";
