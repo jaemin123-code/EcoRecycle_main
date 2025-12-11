@@ -52,36 +52,28 @@ class _AiCameraScreenState extends State<AiCameraScreen> {
   }
 
   // 3. 사진 찍고 분석하기
+ // 3. 사진 찍고 분석하기 (수정된 버전)
   Future<void> _captureAndAnalyze() async {
     if (_controller == null || !_controller!.value.isInitialized || _isBusy) return;
 
     setState(() {
       _isBusy = true;
       _result = "분석 중...";
+      _guideMessage = ""; 
     });
 
     try {
-      // 사진 촬영
       final imageFile = await _controller!.takePicture();
-
-      // 이미지 전처리 (파일 읽기 -> 리사이징 -> 데이터 변환)
       var imageBytes = await File(imageFile.path).readAsBytes();
       img.Image? originalImage = img.decodeImage(imageBytes);
 
       if (originalImage != null) {
-        // Teachable Machine은 224x224 크기를 원합니다.
         img.Image resizedImage = img.copyResize(originalImage, width: 224, height: 224);
-
-        // 입력 데이터 만들기 (Float32List [1, 224, 224, 3])
         var input = _imageToFloat32List(resizedImage);
-
-        // 출력 데이터 그릇 만들기 (클래스 개수만큼)
         var output = List.filled(1 * _labels!.length, 0.0).reshape([1, _labels!.length]);
-
-        // 추론 실행!
+        
         _interpreter?.run(input, output);
 
-        // 결과 해석 (가장 높은 확률 찾기)
         List<double> probabilities = List<double>.from(output[0]);
         int maxIndex = 0;
         double maxProb = 0.0;
@@ -94,10 +86,39 @@ class _AiCameraScreenState extends State<AiCameraScreen> {
         }
 
         setState(() {
-          String predictedLabel = _labels![maxIndex];
-          // 라벨에서 앞의 숫자 제거 (예: "0 Plastic" -> "Plastic")
-          predictedLabel = predictedLabel.replaceAll(RegExp(r'^[0-9]+\s'), '');
-          _result = "결과: $predictedLabel\n확률: ${(maxProb * 100).toStringAsFixed(1)}%";
+          // 1. 라벨 이름 가져오기 (숫자 제거)
+          String rawLabel = _labels![maxIndex];
+          String predictedLabel = rawLabel.replaceAll(RegExp(r'^[0-9]+\s'), '').trim();
+          
+          // 2. 소문자로 바꿔서 비교하기 쉽게 만들기
+          String key = predictedLabel.toLowerCase(); 
+
+          // ---------------------------------------------------------
+          // 🔥 여기가 핵심! (여기에 본인이 원하는 단어와 멘트를 적으세요)
+          // ---------------------------------------------------------
+          if (key.contains('pet') || key.contains('bottle')) {
+            // 'pet'이나 'bottle'이라는 글자가 포함되어 있으면 이 멘트 출력
+            _guideMessage = "💡 페트병 발견!\n👉 라벨은 떼서 [비닐]로\n👉 뚜껑은 [플라스틱]으로\n👉 몸통은 찌그러뜨려 [투명페트]로 버려주세요.";
+          } 
+          else if (key.contains('can')) {
+             _guideMessage = "💡 캔 발견!\n👉 내용물을 비우고 발로 밟아 납작하게 배출해주세요.";
+          }
+          else if (key.contains('glass') || key.contains('cup')) {
+             _guideMessage = "💡 유리/컵 발견!\n👉 깨지지 않게 주의하고 뚜껑은 따로 분리해주세요.";
+          }
+          else if (key.contains('vinyl') || key.contains('snack')) {
+             _guideMessage = "💡 비닐류 발견!\n👉 음식물이 묻었다면 [일반쓰레기]로, 깨끗하면 [비닐]로 배출하세요.";
+          }
+          else if (key.contains('plastic') || key.contains('mouse')) {
+             _guideMessage = "💡 플라스틱 발견!\n👉 이물질을 제거하고 [플라스틱]으로 배출해주세요.";
+          } 
+          else {
+            // 그 외의 물건일 때
+            _guideMessage = "💡 분리배출 표시를 확인해주세요.";
+          }
+          // ---------------------------------------------------------
+
+          _result = "$predictedLabel\n(${(maxProb * 100).toStringAsFixed(1)}%)";
         });
       }
     } catch (e) {
